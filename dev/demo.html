@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Evim Nova – demo</title>
+<!-- Demo home with made-up devices (dev/mock-evim.js). Serve the repo root and open /dev/demo.html, e.g.
+     npx http-server . -p 8097 -c-1  →  http://localhost:8097/dev/demo.html#/salon
+     Options: ?lang=en · ?tema=neon (cam, isima, gece, gunbatimi, orman, neon, buz) · ?duzen=izgara · ?alarm=arming|pending|triggered
+              ?tab=gorunum (with #/instellingen) · ?shot (no animations) · ?popup=climate:climate.kombi -->
+<script src="https://cdn.jsdelivr.net/npm/iconify-icon@2.1.0/dist/iconify-icon.min.js"></script>
+<style>html,body{margin:0;height:100%;background:#16181d}</style>
+</head>
+<body>
+<script type="module">
+  if (!customElements.get("ha-icon")) {
+    customElements.define("ha-icon", class extends HTMLElement {
+      static get observedAttributes() { return ["icon"]; }
+      constructor() { super(); this.attachShadow({ mode: "open" }); }
+      connectedCallback() { this.style.display = "inline-flex"; this.render(); }
+      attributeChangedCallback() { if (this.shadowRoot) this.render(); }
+      render() { this.shadowRoot.innerHTML = `<iconify-icon icon="${this.getAttribute("icon") || ""}" style="font-size:var(--mdc-icon-size,24px)"></iconify-icon>`; }
+    });
+  }
+  const q = new URLSearchParams(location.search);
+  try {
+    localStorage.setItem("selectedLanguage", JSON.stringify(q.get("lang") || "tr"));
+    if (q.has("shot")) localStorage.setItem("evimAlarmSes", "0");   // screenshots: no alarm sound (a headless browser blocks it anyway)
+  } catch { /* no storage */ }
+  const { makeHass, demoConfig } = await import("./mock-evim.js");
+  await import("../dist/evim-nova.js?v=" + Date.now());
+
+  const el = document.createElement("evim-nova");
+  const cfg = demoConfig();
+  if (q.get("tema")) cfg.tema = { ad: q.get("tema") };
+  if (q.get("duzen")) cfg.duzen = q.get("duzen");
+  el.cardConfig = cfg;
+  el.loadConfig = async () => { el.applyConfig(); };
+  el.hass = makeHass(h => { el.hass = { ...h }; }, { alarm: q.get("alarm") || "disarmed" });
+  el.panel = { url_path: "evim-nova" };
+  el.hass.userData = {};
+  const route = () => ({ prefix: "/evim-nova", path: location.hash.replace(/^#/, "") || "/" });
+  el.route = route();
+  history.pushState = (s, t, url) => { location.hash = String(url).replace(/^\/evim-nova/, "") || "/"; };
+  addEventListener("hashchange", () => { el.route = route(); });
+  if (q.get("tab")) el.stab = q.get("tab");
+  if (q.has("shot")) customElements.whenDefined("evim-nova").then(() => el.updateComplete).then(() => {
+    const st = document.createElement("style");
+    st.textContent = "*,*::before,*::after{animation-duration:0s!important;animation-delay:0s!important;transition-duration:0s!important}";
+    el.shadowRoot.append(st);
+  });
+  if (q.get("popup")) setTimeout(() => {
+    const [type, id] = q.get("popup").split(":");
+    const all = el.rooms.flatMap(r => Object.values(r.ents).filter(Array.isArray).flat());
+    const e = id ? all.find(x => x?.id === id || x?.entity_id === id) : undefined;
+    el.openPopup({ type, e, s: e?.state || e, a: e });
+  }, 900);
+  if (q.has("edit")) setTimeout(() => el.startEdit(el.room?.id || "home"), 900);
+  document.body.appendChild(el);
+  window.panel = el;
+</script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+blueprint:
+  name: "Evim Nova · IR klima modunu takip et / track an IR air conditioner"
+  description: >-
+    TR: Kızılötesi (IR) ile çalışan klimalar durum bildirmez. Bu otomasyon, klimayı ısıtma / soğutma / kapat
+    sahnelerinden (ya da scriptlerinden) biri çalışınca son modu bir input_select'e yazar; Evim Nova'nın animasyonlu
+    klima kartı bunu gösterir. Sahne yeniden yüklenip "unavailable"dan dönerse bunu çalıştırma saymaz.
+
+    EN: Air conditioners controlled over infrared do not report their state. When one of the heat / cool / off scenes
+    (or scripts) runs, this writes the last mode to an input_select, which Evim Nova's animated AC card shows.
+    A scene coming back from "unavailable" after a reload is not counted as a run.
+  domain: automation
+  source_url: https://github.com/turkerkirgin/evim-nova/blob/main/homeassistant/blueprints/automation/evim_nova/klima_modu_takibi.yaml
+  input:
+    mod:
+      name: Mod yardımcısı / Mode helper
+      default: input_select.klima_modu
+      selector:
+        entity:
+          filter:
+            - domain: input_select
+    isit:
+      name: Isıtma sahnesi / Heat scene or script
+      selector:
+        entity:
+          filter:
+            - domain: [scene, script]
+    sogut:
+      name: Soğutma sahnesi / Cool scene or script
+      selector:
+        entity:
+          filter:
+            - domain: [scene, script]
+    kapat:
+      name: Kapatma sahnesi / Off scene or script
+      selector:
+        entity:
+          filter:
+            - domain: [scene, script]
+
+mode: queued
+
+variables:
+  mod_entity: !input mod
+  isit: !input isit
+  sogut: !input sogut
+  secenekler: "{{ state_attr(mod_entity, 'options') or [] }}"
+  # seçenekler Türkçe ya da İngilizce olabilir: [Kapalı, Isıtma, Soğutma] veya [Off, Heat, Cool]
+  hedef: >-
+    {% set m = 1 if trigger.entity_id == isit else 2 if trigger.entity_id == sogut else 0 %}
+    {{ secenekler[m] if secenekler | length > m else ['Kapalı', 'Isıtma', 'Soğutma'][m] }}
+
+triggers:
+  - trigger: state
+    entity_id:
+      - !input isit
+      - !input sogut
+      - !input kapat
+
+conditions:
+  # sahne: durum = son çalıştırma zamanı; script: "on" olunca çalıştı demektir.
+  # "unavailable"dan dönüş (entegrasyon yeniden yüklendi) çalıştırma değildir; hiç çalışmamış sahne "unknown"dan gelir, o sayılır.
+  - condition: template
+    value_template: >-
+      {{ trigger.from_state is not none and trigger.from_state.state != 'unavailable'
+         and trigger.to_state.state not in ['unavailable', 'unknown', 'off'] }}
+
+actions:
+  - action: input_select.select_option
+    target:
+      entity_id: !input mod
+    data:
+      option: "{{ hedef }}"

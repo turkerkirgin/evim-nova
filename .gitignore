@@ -1,0 +1,20 @@
+node_modules/
+site/
+
+# per-install files (not part of the project)
+config.json
+dist/version.json
+dist/icons/
+dev/private/
+
+# dev build and the per-machine deploy target
+dist-dev/
+deploy.local.json
+
+# never commit secrets or personal Home Assistant data
+secrets.yaml
+*.token
+ha_token*.txt
+.env
+__pycache__/
+*.log

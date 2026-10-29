@@ -1,0 +1,58 @@
+blueprint:
+  name: "Evim Nova · Duvar tableti ekranını aç / wake the wall tablet"
+  description: >-
+    TR: Kapı açılınca ya da alarm kurulurken, giriş süresinde ve çalarken Android duvar tabletinin ekranını açar.
+    Tablette Home Assistant uygulaması kurulu olmalı; ekranı Android'in kendi zaman aşımı kapatır (ör. 1 dk).
+    Hareket sensörü ekranı açmaz (bilerek): yalnız önemli anlarda yanar, şarj ve ekran ömrü korunur.
+
+    EN: Turns on the screen of an Android wall tablet when a door opens, or while the alarm is arming, in its entry
+    delay or sounding. The tablet needs the Home Assistant app; Android's own screen timeout turns it off again.
+    Motion does not wake it on purpose, to save the battery and the screen.
+  domain: automation
+  source_url: https://github.com/turkerkirgin/evim-nova/blob/main/homeassistant/blueprints/automation/evim_nova/tablet_ekrani.yaml
+  input:
+    bildirim:
+      name: Tabletin bildirim servisi / The tablet's notify action
+      description: ör. / e.g. notify.mobile_app_duvar_tableti
+      selector:
+        text:
+    kapilar:
+      name: Kapılar / Doors
+      default: []
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: binary_sensor
+    alarm:
+      name: Alarm paneli (isteğe bağlı) / Alarm panel (optional)
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: alarm_control_panel
+
+mode: queued
+max: 3
+
+variables:
+  bildirim: !input bildirim
+  alarm_entity: !input alarm
+
+triggers:
+  - trigger: state
+    entity_id: !input kapilar
+    to: "on"
+  - trigger: template
+    value_template: "{{ alarm_entity != '' and states(alarm_entity) in ['arming', 'pending', 'triggered'] }}"
+
+actions:
+  - repeat:
+      # alarm sürerken 15 sn'de bir yeniden aç (biri dokunup kapatsa bile) / keep it on while the alarm is active
+      while: "{{ repeat.index == 1 or (alarm_entity != '' and states(alarm_entity) in ['arming', 'pending', 'triggered'] and repeat.index < 80) }}"
+      sequence:
+        - action: "{{ bildirim }}"
+          continue_on_error: true
+          data:
+            message: command_screen_on
+        - delay: 15

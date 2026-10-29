@@ -1,0 +1,108 @@
+# Evim Nova · örnek pano / example dashboard
+#
+# TR: Ayarlar → Panolar → Pano ekle → "Sıfırdan yeni pano" → panoyu aç → ✏️ → ⋮ → "Ham yapılandırma düzenleyicisi"
+#     ve bu dosyanın tamamını yapıştır. Sonra aşağıdaki varlık adlarını (light.…, climate.… vb.) kendi cihazlarınla
+#     değiştir. Bilmediğin ya da kullanmadığın bölümleri silebilirsin: panel boş bıraktıklarını kendisi bulur.
+#     Odalar Home Assistant alanlarından (Ayarlar → Alanlar) gelir; "area" alanın kimliğidir (ör. salon, mutfak).
+# EN: Settings → Dashboards → Add dashboard → "New dashboard from scratch" → open it → ✏️ → ⋮ → "Raw configuration editor"
+#     and paste this whole file. Then replace the entity ids (light.…, climate.… etc.) with your own devices.
+#     Delete whatever you do not need: the panel finds the rest by itself.
+#     Rooms come from Home Assistant areas (Settings → Areas); "area" is the area id (e.g. living_room, kitchen).
+#
+# Her şeyi panelin içinden de ayarlayabilirsin (Daha fazla → Panel ayarları); oradaki ayarlar kullanıcı başına saklanır.
+# Everything can also be set inside the panel (More → Panel settings); those settings are stored per user.
+
+title: Evim Nova
+views:
+  - type: panel
+    title: Evim
+    path: ev
+    icon: mdi:home-heart
+    cards:
+      - type: custom:evim-nova-card
+        # full_height: true                 # kiosk-mode ile üst çubuk gizliyse tüm ekranı kapla / fill the screen when the header is hidden
+        # status_bar: "rgb(22, 24, 29)"     # Android uygulamasında durum çubuğu rengi / status bar colour in the Android app
+        config:
+          title: Evim
+          # language: tr                    # boş = Home Assistant profil dili / empty = your HA profile language
+          rooms:                            # sıra = menüdeki sıra / order = order in the menu
+            - { area: salon, name: Salon, image: /local/images/rooms/salon.jpg }
+            - { area: mutfak, name: Mutfak, image: /local/images/rooms/mutfak.jpg }
+            - { area: yatak_odasi, name: Yatak Odası, image: /local/images/rooms/yatak-odasi.jpg }
+            - { area: koridor, name: Koridor, image: /local/images/rooms/koridor.jpg }
+          homeImage: /local/images/rooms/home.jpg
+          home:
+            weather: weather.forecast_home
+            climate: climate.kombi
+            alarm: alarm_control_panel.ev_alarmi
+            scenes: [scene.film, scene.okuma]                     # "Sahneler" kartı / the scenes card
+            shortcuts: [script.panjurlari_ac, script.tum_isiklari_kapat]   # "Kısayollar" kartı / the shortcuts card
+            quick:                                                # selamlamanın altındaki düğmeler / buttons under the greeting
+              - { type: script, entity: script.gunaydin, label: Günaydın, icon: mdi:weather-sunset-up }
+              - { type: script, entity: script.iyi_geceler, label: İyi geceler, icon: mdi:weather-night }
+              - { type: script, entity: script.evden_cikis, label: Çıkış, icon: mdi:home-export-outline, confirm: true }
+            # doorbell: { camera: camera.koridor, triggers: [binary_sensor.giris_kapisi], seconds: 30 }   # kapı açılınca kamera
+          cards:
+            climate.kombi: { hidden: true }   # odada termostat yerine animasyonlu kombi kartı / animated boiler card instead
+
+          # ---- Evim Nova eklentileri / Evim Nova extras (hepsi isteğe bağlı / all optional) ----
+
+          # Alarm ekranı: süreler alarm panelindeki arming_time / delay_time ile aynı olmalı
+          # Alarm screen: times must match arming_time / delay_time of the alarm panel (homeassistant/packages/evim_nova.yaml)
+          alarm:
+            cikis: 120                       # çıkış süresi (sn) / exit delay (s)
+            giris: 35                        # giriş süresi (sn) / entry delay (s)
+            sebep: input_text.alarm_sebep
+            # ipucu: "Ya da kapı butonuna 2 kez bas."   # ekranda ek ipucu / an extra hint on the screen
+            # sesYolu: /local/sesler/                  # siren.wav, uyari.wav, kurulum.wav, devrede.wav
+
+          # Animasyonlu kombi kartı (gerçek bir climate varlığı) / animated boiler card (a real climate entity)
+          kombi: { ad: Kombi, entity: climate.kombi, oda: koridor }
+
+          # Animasyonlu klima kartı (IR klima: sahneler + son modu tutan input_select) / animated IR air conditioner card
+          klima:
+            ad: Klima
+            oda: salon
+            oda_adi: Salon
+            mod: input_select.klima_modu
+            sicaklik: sensor.salon_sicaklik
+            isit: scene.klima_isit
+            sogut: scene.klima_sogut
+            kapat: scene.klima_kapat
+
+          # Senaryolar sayfası (Daha fazla → Senaryolar) / Scenarios page (More → Scenarios)
+          scenarios:
+            - { entity: script.gunaydin, label: Günaydın, sub: panjurlar açılır, icon: mdi:weather-sunset-up, color: "#f6b73c" }
+            - { entity: script.film_gecesi, label: Film Gecesi, sub: ışıklar kısılır, icon: mdi:movie-open, color: "#a66bff" }
+            - { entity: script.evden_cikis, label: Evden Çıkış, sub: her şey kapanır, icon: mdi:home-export-outline, color: "#ff5c7a", confirm: "Emin misin?" }
+          # scenarioPrefix: "Evim ·"         # bu önekle başlayan otomasyonlar ayrı blokta / automations with this prefix get their own block
+
+          # Panel ayarları → Kamera sekmesi (anahtarlar + durum) / Panel settings → Camera tab
+          kamera:
+            durum: { kamera: camera.koridor, kisi: sensor.koridor_person_count }
+            # anahtarlar:                      # varsayılan: input_boolean.kamera_sistemi + kamera_isiklari
+            #   - { e: input_boolean.misafir_modu, ad: Misafir modu, ikon: mdi:account-group }
+
+          # Piyasalar kartı ve Haberler sayfası: homeassistant/packages/evim_bilgi.yaml
+          # Markets card and News page: homeassistant/packages/evim_bilgi.yaml
+          piyasa:
+            kartta: 4
+            liste:
+              - { e: sensor.piyasa_dolar, ad: Dolar, birim: "₺", ikon: mdi:currency-usd, basamak: 2 }
+              - { e: sensor.piyasa_euro, ad: Euro, birim: "₺", ikon: mdi:currency-eur, basamak: 2 }
+              - { e: sensor.piyasa_gram_altin, ad: Gram altın, birim: "₺", ikon: mdi:gold, basamak: 0 }
+              - { e: sensor.piyasa_bitcoin, ad: Bitcoin, birim: "$", ikon: mdi:bitcoin, basamak: 0 }
+          haberler:
+            adet: 48
+            kaynaklar:
+              - { id: bbc_tr, ad: BBC Türkçe, sensor: sensor.haber_bbc_turkce }
+              - { id: euronews, ad: Euronews, sensor: sensor.haber_euronews, ikon: mdi:earth }
+
+          # Kat planı ve harita sayfaları: herhangi bir Lovelace kartı (ör. picture-elements, map)
+          # Floor plan and map pages: any Lovelace card config
+          # floorplan: { type: picture-elements, image: /local/plan.png, elements: [] }
+          map: { type: map, entities: [person.ben], hours_to_show: 0 }
+
+          hidePages: [energie]               # gizlenecek sayfalar / pages to hide (energie, katplani, haberler, harita, senaryolar …)
+          # Panelden "Kaydet"e basılsa da bu bölümler hep panodan okunur / these always come from the dashboard
+          yonetilen: [alarm, klima, kombi, piyasa, haberler, scenarios, floorplan, map, hidePages]

@@ -1,0 +1,154 @@
+blueprint:
+  name: "Evim Nova · Alarm: bildirim ve ışıklar / notify and lights"
+  description: >-
+    TR: Alarm çalınca telefona kritik bildirim gönderir (isteğe bağlı kamera görüntüsüyle, "Alarmı kapat" düğmesiyle)
+    ve seçtiğin ışıkları alarm susana kadar yakıp söndürür. Giriş süresi başlayınca da kısa bir uyarı yollar.
+    Telefonun Home Assistant uygulamasında bildirim izni açık olmalı.
+
+    EN: When the alarm goes off, sends a critical notification to a phone (optionally with a camera image and a
+    "Disarm" button) and flashes the chosen lights until the alarm stops. Also sends a short warning when the entry
+    delay starts. Notifications must be allowed in the Home Assistant app on the phone.
+  domain: automation
+  source_url: https://github.com/turkerkirgin/evim-nova/blob/main/homeassistant/blueprints/automation/evim_nova/alarm_bildirim.yaml
+  input:
+    alarm:
+      name: Alarm paneli / Alarm panel
+      selector:
+        entity:
+          filter:
+            - domain: alarm_control_panel
+    bildirim:
+      name: Bildirim servisi / Notify action
+      description: >-
+        Telefonun bildirim servisi, ör. notify.mobile_app_telefonum (Geliştirici araçları → Eylemler'de "mobile_app" ara).
+        / The phone's notify action, e.g. notify.mobile_app_my_phone (Developer tools → Actions, search "mobile_app").
+      selector:
+        text:
+    kamera:
+      name: Kamera (isteğe bağlı) / Camera (optional)
+      default: ""
+      selector:
+        entity:
+          filter:
+            - domain: camera
+    sebep:
+      name: Sebep yardımcısı / Reason helper
+      default: input_text.alarm_sebep
+      selector:
+        entity:
+          filter:
+            - domain: input_text
+    isiklar:
+      name: Yanıp sönecek ışıklar / Lights to flash
+      default: []
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: light
+    pano:
+      name: Bildirime dokununca açılacak adres / Path opened from the notification
+      default: /evim-nova
+      selector:
+        text:
+
+mode: restart
+
+variables:
+  alarm_entity: !input alarm
+  bildirim: !input bildirim
+  kamera: !input kamera
+  sebep_entity: !input sebep
+  pano: !input pano
+  isiklar: !input isiklar
+  neden: "{{ states(sebep_entity) if states(sebep_entity) not in ['unknown', 'unavailable', ''] else '' }}"
+
+triggers:
+  - trigger: state
+    entity_id: !input alarm
+    to: triggered
+    id: caliyor
+  - trigger: state
+    entity_id: !input alarm
+    to: pending
+    id: giris
+  - trigger: event
+    event_type: mobile_app_notification_action
+    event_data:
+      action: EVIM_ALARM_KAPAT
+    id: kapat
+
+actions:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: giris
+        sequence:
+          - action: "{{ bildirim }}"
+            continue_on_error: true
+            data:
+              title: "⚠️ Giriş algılandı / Entry detected"
+              message: "{{ neden or 'Alarm' }} · şifreyi gir / enter the code"
+              data:
+                url: "{{ pano }}"
+                clickAction: "{{ pano }}"
+      - conditions:
+          - condition: trigger
+            id: kapat
+        sequence:
+          # şifre bildirimdeki metin kutusundan gelir; telefon önce kimlik doğrulaması ister
+          # the code comes from the notification's text field; the phone asks to unlock first
+          - action: alarm_control_panel.alarm_disarm
+            target:
+              entity_id: !input alarm
+            data:
+              code: "{{ trigger.event.data.reply_text | default('') }}"
+      - conditions:
+          - condition: trigger
+            id: caliyor
+        sequence:
+          - action: "{{ bildirim }}"
+            continue_on_error: true
+            data:
+              title: "🚨 ALARM"
+              message: "{{ neden or 'Alarm çalıyor / Alarm is sounding' }}"
+              data:
+                url: "{{ pano }}"
+                clickAction: "{{ pano }}"
+                entity_id: "{{ kamera }}"
+                push:
+                  interruption-level: critical
+                  sound:
+                    name: default
+                    critical: 1
+                    volume: 1.0
+                ttl: 0
+                priority: high
+                channel: alarm_stream
+                actions:
+                  - action: EVIM_ALARM_KAPAT
+                    title: "Alarmı kapat / Disarm"
+                    behavior: textInput
+                    textInputButtonTitle: "Kapat / Disarm"
+                    textInputPlaceholder: "Şifre / Code"
+                    authenticationRequired: true
+          - if: "{{ isiklar | length > 0 }}"
+            then:
+              - action: scene.create
+                data:
+                  scene_id: evim_alarm_oncesi
+                  snapshot_entities: "{{ isiklar }}"
+              - repeat:
+                  while: "{{ is_state(alarm_entity, 'triggered') and repeat.index < 400 }}"
+                  sequence:
+                    - action: light.turn_on
+                      target:
+                        entity_id: "{{ isiklar }}"
+                    - delay: 1
+                    - action: light.turn_off
+                      target:
+                        entity_id: "{{ isiklar }}"
+                    - delay: 1
+              - action: scene.turn_on
+                target:
+                  entity_id: scene.evim_alarm_oncesi

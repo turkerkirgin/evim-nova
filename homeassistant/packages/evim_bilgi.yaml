@@ -1,0 +1,138 @@
+# Evim Nova · Haberler ve Piyasalar / News and markets (optional)
+# Kaynaklar: RSS (BBC Türkçe, Euronews Türkçe, BBC World) ve Yahoo Finance (anahtarsız).
+# Her 15 dakikada güncellenir. Haber listeleri büyük olduğu için geçmişe (recorder) yazılmaz.
+# Evim Nova'daki "Haberler" sayfası ve "Piyasalar" kartı bu sensörleri okur.
+
+rest:
+  # ---------------- haberler ----------------
+  - resource: https://feeds.bbci.co.uk/turkce/rss.xml
+    scan_interval: 900
+    timeout: 20
+    sensor:
+      - name: "Haber BBC Türkçe"
+        unique_id: evim_haber_bbc_turkce
+        icon: mdi:newspaper-variant-outline
+        value_template: "{{ (value_json.rss.channel.item[0].title | default('—'))[:250] }}"
+        json_attributes_path: "$.rss.channel"
+        json_attributes: [item]
+  - resource: "https://tr.euronews.com/rss?format=mrss"
+    scan_interval: 900
+    timeout: 20
+    sensor:
+      - name: "Haber Euronews"
+        unique_id: evim_haber_euronews
+        icon: mdi:earth
+        value_template: "{{ (value_json.rss.channel.item[0].title | default('—'))[:250] }}"
+        json_attributes_path: "$.rss.channel"
+        json_attributes: [item]
+  - resource: https://feeds.bbci.co.uk/news/world/rss.xml
+    scan_interval: 900
+    timeout: 20
+    sensor:
+      - name: "Haber BBC World"
+        unique_id: evim_haber_bbc_world
+        icon: mdi:web
+        value_template: "{{ (value_json.rss.channel.item[0].title | default('—'))[:250] }}"
+        json_attributes_path: "$.rss.channel"
+        json_attributes: [item]
+
+  # ---------------- piyasalar (Yahoo Finance) ----------------
+  - resource: "https://query1.finance.yahoo.com/v8/finance/chart/USDTRY=X?interval=1d&range=1d"
+    headers: { User-Agent: "Mozilla/5.0" }
+    scan_interval: 900
+    timeout: 20
+    sensor:
+      - name: "Piyasa Dolar"
+        unique_id: evim_piyasa_usdtry
+        icon: mdi:currency-usd
+        unit_of_measurement: "₺"
+        state_class: measurement
+        value_template: "{{ value_json.chart.result[0].meta.regularMarketPrice | round(4) }}"
+        json_attributes_path: "$.chart.result[0].meta"
+        json_attributes: [chartPreviousClose, regularMarketTime]
+  - resource: "https://query1.finance.yahoo.com/v8/finance/chart/EURTRY=X?interval=1d&range=1d"
+    headers: { User-Agent: "Mozilla/5.0" }
+    scan_interval: 900
+    timeout: 20
+    sensor:
+      - name: "Piyasa Euro"
+        unique_id: evim_piyasa_eurtry
+        icon: mdi:currency-eur
+        unit_of_measurement: "₺"
+        state_class: measurement
+        value_template: "{{ value_json.chart.result[0].meta.regularMarketPrice | round(4) }}"
+        json_attributes_path: "$.chart.result[0].meta"
+        json_attributes: [chartPreviousClose, regularMarketTime]
+  - resource: "https://query1.finance.yahoo.com/v8/finance/chart/GBPTRY=X?interval=1d&range=1d"
+    headers: { User-Agent: "Mozilla/5.0" }
+    scan_interval: 900
+    timeout: 20
+    sensor:
+      - name: "Piyasa Sterlin"
+        unique_id: evim_piyasa_gbptry
+        icon: mdi:currency-gbp
+        unit_of_measurement: "₺"
+        state_class: measurement
+        value_template: "{{ value_json.chart.result[0].meta.regularMarketPrice | round(4) }}"
+        json_attributes_path: "$.chart.result[0].meta"
+        json_attributes: [chartPreviousClose, regularMarketTime]
+  - resource: "https://query1.finance.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=1d"
+    headers: { User-Agent: "Mozilla/5.0" }
+    scan_interval: 900
+    timeout: 20
+    sensor:
+      - name: "Piyasa Ons Altın"
+        unique_id: evim_piyasa_ons_altin
+        icon: mdi:gold
+        unit_of_measurement: "$"
+        state_class: measurement
+        value_template: "{{ value_json.chart.result[0].meta.regularMarketPrice | round(2) }}"
+        json_attributes_path: "$.chart.result[0].meta"
+        json_attributes: [chartPreviousClose, regularMarketTime]
+  - resource: "https://query1.finance.yahoo.com/v8/finance/chart/XU100.IS?interval=1d&range=1d"
+    headers: { User-Agent: "Mozilla/5.0" }
+    scan_interval: 900
+    timeout: 20
+    sensor:
+      - name: "Piyasa BIST 100"
+        unique_id: evim_piyasa_bist100
+        icon: mdi:chart-line
+        unit_of_measurement: "puan"
+        state_class: measurement
+        value_template: "{{ value_json.chart.result[0].meta.regularMarketPrice | round(2) }}"
+        json_attributes_path: "$.chart.result[0].meta"
+        json_attributes: [chartPreviousClose, regularMarketTime]
+  - resource: "https://query1.finance.yahoo.com/v8/finance/chart/BTC-USD?interval=1d&range=1d"
+    headers: { User-Agent: "Mozilla/5.0" }
+    scan_interval: 900
+    timeout: 20
+    sensor:
+      - name: "Piyasa Bitcoin"
+        unique_id: evim_piyasa_bitcoin
+        icon: mdi:bitcoin
+        unit_of_measurement: "$"
+        state_class: measurement
+        value_template: "{{ value_json.chart.result[0].meta.regularMarketPrice | round(0) }}"
+        json_attributes_path: "$.chart.result[0].meta"
+        json_attributes: [chartPreviousClose, regularMarketTime]
+
+template:
+  - sensor:
+      # gram altın (TL) = ons altın ($) × dolar (₺) ÷ 31,1035
+      - name: "Piyasa Gram Altın"
+        unique_id: evim_piyasa_gram_altin
+        icon: mdi:gold
+        unit_of_measurement: "₺"
+        state_class: measurement
+        availability: "{{ has_value('sensor.piyasa_ons_altin') and has_value('sensor.piyasa_dolar') }}"
+        state: "{{ (states('sensor.piyasa_ons_altin') | float * states('sensor.piyasa_dolar') | float / 31.1035) | round(2) }}"
+        attributes:
+          chartPreviousClose: >
+            {% set o = state_attr('sensor.piyasa_ons_altin', 'chartPreviousClose') %}
+            {% set d = state_attr('sensor.piyasa_dolar', 'chartPreviousClose') %}
+            {{ (o * d / 31.1035) | round(2) if o and d else none }}
+
+recorder:
+  exclude:
+    entity_globs:
+      - sensor.haber_*

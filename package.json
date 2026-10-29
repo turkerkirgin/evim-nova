@@ -1,0 +1,23 @@
+{
+  "name": "evim-nova",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Evim Nova: a room-first, Turkish/English Home Assistant panel with alarm screen, themes and climate cards. Based on HaCasa Nova.",
+  "license": "MIT",
+  "repository": "github:turkerkirgin/evim-nova",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:dev": "node build.mjs --dev",
+    "deploy:dev": "node dev/deploy-dev.mjs",
+    "watch": "node build.mjs --watch",
+    "icons": "node dev/make-icons.mjs",
+    "i18n:check": "node dev/i18n-check.mjs && node dev/evim-i18n-check.mjs"
+  },
+  "dependencies": {
+    "lit": "^3.2.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.1"
+  }
+}

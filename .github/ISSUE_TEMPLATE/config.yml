@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Upstream project (HaCasa Nova)
+    url: https://github.com/damianeickhoff/HaCasa
+    about: Evim Nova is based on HaCasa Nova. Questions about the base panel can also go there.

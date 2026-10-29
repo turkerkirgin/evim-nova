@@ -1,0 +1,60 @@
+# Evim Nova · yardımcılar ve alarm paneli / helpers and alarm panel
+#
+# TR: Bu dosyayı /config/packages/ klasörüne kopyala. configuration.yaml içinde şu satırlar olmalı:
+#       homeassistant:
+#         packages: !include_dir_named packages
+#     Alarm şifresini secrets.yaml dosyasına yaz:  evim_alarm_kodu: "1234"
+#     Sonra Home Assistant'ı yeniden başlat. Kullanmadığın bölümleri silebilirsin.
+# EN: Copy this file to /config/packages/. configuration.yaml needs:
+#       homeassistant:
+#         packages: !include_dir_named packages
+#     Put the alarm code in secrets.yaml:  evim_alarm_kodu: "1234"
+#     Then restart Home Assistant. Delete the parts you do not use.
+
+# --- Alarm: Home Assistant'ın yerleşik "manual" alarm paneli / the built-in manual alarm panel ---
+# Süreler panel ayarındaki alarm.cikis / alarm.giris ile aynı olmalı (ekrandaki geri sayım bunlardan hesaplanır).
+# The times must match alarm.cikis / alarm.giris in the dashboard config (the on-screen countdown uses them).
+alarm_control_panel:
+  - platform: manual
+    name: Ev Alarmı
+    unique_id: evim_nova_ev_alarmi
+    code: !secret evim_alarm_kodu
+    code_arm_required: false
+    arming_time: 120        # çıkış süresi / exit delay (s)
+    delay_time: 35          # giriş süresi / entry delay (s)
+    trigger_time: 600       # çalma süresi / how long it sounds (s)
+    disarm_after_trigger: false
+    armed_home:
+      arming_time: 0
+      delay_time: 0
+    armed_night:
+      arming_time: 0
+      delay_time: 0
+    armed_custom_bypass:    # test modu: anında kurulur, beklemeden çalar, 15 sn sonra susar / test mode
+      arming_time: 0
+      delay_time: 0
+      trigger_time: 15
+    disarmed:
+      trigger_time: 0       # kapalıyken tetiklenmez / never triggers while disarmed
+
+input_text:
+  alarm_sebep:               # alarm ekranında "neden" satırı / the "reason" line on the alarm screen
+    name: Alarm sebebi
+    max: 120
+
+input_boolean:
+  kamera_sistemi:            # Panel ayarları → Kamera / Panel settings → Camera
+    name: Kamera sistemi
+    icon: mdi:cctv
+  kamera_isiklari:
+    name: Kamera ışıkları
+    icon: mdi:lightbulb-auto-outline
+
+# --- Kızılötesi (IR) klima için son mod / last mode of an IR air conditioner ---
+# IR klimalar durum bildirmez; klima kartı son modu buradan okur. "Klima modu takibi" blueprint'i günceller.
+# IR air conditioners do not report their state; the card reads the last mode from here. The blueprint keeps it updated.
+input_select:
+  klima_modu:
+    name: Klima modu
+    options: ["Kapalı", "Isıtma", "Soğutma"]   # İngilizce de olur / English works too: Off, Heat, Cool
+    icon: mdi:air-conditioner

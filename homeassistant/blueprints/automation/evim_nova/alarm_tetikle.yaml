@@ -1,0 +1,80 @@
+blueprint:
+  name: "Evim Nova · Alarm: sensörle tetikle / trigger from sensors"
+  description: >-
+    TR: Alarm kuruluyken seçtiğin kapı, pencere ya da hareket sensörlerinden biri açılınca alarmı tetikler ve
+    sebebini (ör. "Giriş kapısı açıldı") Evim Nova'nın alarm ekranında görünmesi için yardımcıya yazar.
+    Giriş süresi (delay_time) alarm panelinde ayarlıdır; bu sürede ekranda geri sayım ve şifre tuşları çıkar.
+
+    EN: While the alarm is armed, triggers it when one of the chosen door, window or motion sensors turns on, and
+    writes the reason (e.g. "Front door opened") to a helper so Evim Nova's alarm screen can show it.
+    The entry delay (delay_time) is set on the alarm panel; during it the screen shows a countdown and a keypad.
+  domain: automation
+  source_url: https://github.com/turkerkirgin/evim-nova/blob/main/homeassistant/blueprints/automation/evim_nova/alarm_tetikle.yaml
+  input:
+    alarm:
+      name: Alarm paneli / Alarm panel
+      selector:
+        entity:
+          filter:
+            - domain: alarm_control_panel
+    sensorler:
+      name: Sensörler / Sensors
+      description: Kapı, pencere, hareket… / Doors, windows, motion…
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: binary_sensor
+    durumlar:
+      name: Hangi kurulu modlarda / In which armed modes
+      default: [armed_away]
+      selector:
+        select:
+          multiple: true
+          options:
+            - label: Dışarıda / Away
+              value: armed_away
+            - label: Evde / Home
+              value: armed_home
+            - label: Gece / Night
+              value: armed_night
+            - label: Tatil / Vacation
+              value: armed_vacation
+    sebep:
+      name: Sebep yardımcısı / Reason helper
+      description: input_text (evim_nova.yaml paketinde input_text.alarm_sebep)
+      default: input_text.alarm_sebep
+      selector:
+        entity:
+          filter:
+            - domain: input_text
+
+mode: single
+max_exceeded: silent
+
+variables:
+  alarm_entity: !input alarm
+  armed_states: !input durumlar
+
+triggers:
+  - trigger: state
+    entity_id: !input sensorler
+    to: "on"
+
+conditions:
+  - condition: template
+    value_template: "{{ states(alarm_entity) in armed_states }}"
+
+actions:
+  - action: input_text.set_value
+    target:
+      entity_id: !input sebep
+    data:
+      value: >-
+        {% set n = trigger.to_state.attributes.friendly_name or trigger.entity_id %}
+        {% set dc = trigger.to_state.attributes.device_class | default('') %}
+        {% if dc in ['motion', 'occupancy', 'presence'] %}{{ n }}: hareket / motion{% else %}{{ n }}: açıldı / opened{% endif %}
+  # manual panel: tetiklemek için şifre gerekmez / no code needed to trigger
+  - action: alarm_control_panel.alarm_trigger
+    target:
+      entity_id: !input alarm

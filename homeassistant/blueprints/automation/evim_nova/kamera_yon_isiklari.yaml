@@ -1,0 +1,96 @@
+blueprint:
+  name: "Evim Nova · Kamera yön ışığı (Frigate) / camera direction light (Frigate)"
+  description: >-
+    TR: Frigate bir kişinin kamerada A bölgesinden B bölgesine geçtiğini görünce bir ışığı yakar (ör. koridordan yatak
+    odası kapısına yürüyünce yatak odası tavanı). Her yön için bu blueprint'ten ayrı bir otomasyon oluştur.
+    Gerekenler: Frigate (MQTT ile), kamerada tanımlı bölgeler (zones) ve input_boolean.kamera_isiklari anahtarı
+    (Evim Nova → Panel ayarları → Kamera sekmesinden açılıp kapatılır; evde misafir varken kapat).
+    Not: Tek kişinin yaşadığı ya da çoğunlukla tek kişinin dolaştığı evler için tasarlandı.
+
+    EN: When Frigate sees a person move from zone A to zone B on a camera, turns a light on (e.g. walking from the
+    hall to the bedroom door turns on the bedroom ceiling light). Create one automation per direction.
+    Needs Frigate (over MQTT), zones on the camera and the input_boolean.kamera_isiklari switch (toggled from
+    Evim Nova → Panel settings → Camera; turn it off when you have guests). Designed for homes with mostly one person moving around.
+  domain: automation
+  source_url: https://github.com/turkerkirgin/evim-nova/blob/main/homeassistant/blueprints/automation/evim_nova/kamera_yon_isiklari.yaml
+  input:
+    kamera:
+      name: Frigate kamera adı / Frigate camera name
+      description: Frigate yapılandırmasındaki ad, ör. koridor / the name in your Frigate config, e.g. hallway
+      selector:
+        text:
+    nereden:
+      name: Başlangıç bölgesi (A) / From zone (A)
+      description: Boş bırakırsan yalnız varış bölgesine bakılır. / Leave empty to only look at the target zone.
+      default: ""
+      selector:
+        text:
+    nereye:
+      name: Varış bölgesi (B) / To zone (B)
+      selector:
+        text:
+    isik:
+      name: Yakılacak ışık / Light to turn on
+      selector:
+        entity:
+          multiple: true
+          filter:
+            - domain: [light, switch]
+    anahtar:
+      name: Ana anahtar / Master switch
+      default: input_boolean.kamera_isiklari
+      selector:
+        entity:
+          filter:
+            - domain: input_boolean
+    sadece_karanlikta:
+      name: Yalnız karanlıkta / Only when dark
+      description: Güneş batmışsa (sun.sun ufkun altında) / when the sun is below the horizon
+      default: true
+      selector:
+        boolean:
+    baslangic:
+      name: Şu saatten / From time
+      default: "00:00:00"
+      selector:
+        time:
+    bitis:
+      name: Şu saate kadar / Until time
+      default: "23:59:59"
+      selector:
+        time:
+
+mode: single
+max_exceeded: silent
+
+variables:
+  kamera: !input kamera
+  nereden: !input nereden
+  nereye: !input nereye
+  karanlik: !input sadece_karanlikta
+
+triggers:
+  - trigger: mqtt
+    topic: frigate/events
+
+conditions:
+  - condition: state
+    entity_id: !input anahtar
+    state: "on"
+  - condition: time
+    after: !input baslangic
+    before: !input bitis
+  - condition: template
+    value_template: "{{ not karanlik or is_state('sun.sun', 'below_horizon') }}"
+  - condition: template
+    value_template: >-
+      {% set a = trigger.payload_json.after %}
+      {% set b = trigger.payload_json.before %}
+      {{ a.camera == kamera and a.label == 'person'
+         and nereye in a.current_zones and nereye not in (b.current_zones or [])
+         and (nereden == '' or nereden in (b.current_zones or []) or nereden in (b.entered_zones or [])) }}
+
+actions:
+  - action: homeassistant.turn_on
+    target:
+      entity_id: !input isik
